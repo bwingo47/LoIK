@@ -5,11 +5,14 @@
 cmake_minimum_required(VERSION 3.16)
 
 set(PROJECT_NAME loik)
-set(PROJECT_DESCRIPTION "TODO.")
+set(PROJECT_DESCRIPTION "Low-Order Inverse Kinematics")
 set(PROJECT_URL "https://github.com/Simple-Robotics/LoIK")
 set(PROJECT_CUSTOM_HEADER_EXTENSION "hpp")
 set(PROJECT_CUSTOM_HEADER_DIR "loik")
 set(PROJECT_USE_KEYWORD_LINK_LIBRARIES True)
+# To enable jrl-cmakemodules compatibility with workspace we must define the two following lines
+set(PROJECT_AUTO_RUN_FINALIZE FALSE)
+set(PROJECT_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 set(CXX_DISABLE_WERROR True)
 
@@ -19,9 +22,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(PROJECT_USE_CMAKE_EXPORT True)
 
 option(INSTALL_DOCUMENTATION "Generate and install the documentation" ON)
-
-set(DOXYGEN_USE_MATHJAX YES)
-set(DOXYGEN_USE_TEMPLATE_CSS YES)
 
 # Check if the submodule cmake have been initialized
 set(JRL_CMAKE_MODULES "${CMAKE_CURRENT_LIST_DIR}/cmake")
@@ -52,14 +52,22 @@ else()
   endif()
 endif()
 
+set(DOXYGEN_USE_MATHJAX YES)
+set(DOXYGEN_USE_TEMPLATE_CSS YES)
+
+# Use BoostConfig module distributed by boost library instead of using FindBoost module distributed
+# by CMake
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
 include(${JRL_CMAKE_MODULES}/base.cmake)
 compute_project_args(PROJECT_ARGS LANGUAGES CXX)
 project(${PROJECT_NAME} ${PROJECT_ARGS})
-set(CMAKE_VERBOSE_MAKEFILE OFF)
+set(CMAKE_VERBOSE_MAKEFILE TRUE)
 
-include(${CMAKE_CURRENT_LIST_DIR}/cmake/boost.cmake)
-include(${CMAKE_CURRENT_LIST_DIR}/cmake/ide.cmake)
-include(${CMAKE_CURRENT_LIST_DIR}/cmake/apple.cmake)
+include(${JRL_CMAKE_MODULES}/boost.cmake)
+include(${JRL_CMAKE_MODULES}/ide.cmake)
+include(${JRL_CMAKE_MODULES}/apple.cmake)
 include(CMakeDependentOption)
 
 apply_default_apple_configuration()
@@ -77,6 +85,8 @@ endif()
 # --- OPTIONS ----------------------------------------
 option(BUILD_WITH_VERSION_SUFFIX "Build libraries with version appended to suffix" OFF)
 option(ENABLE_TEMPLATE_INSTANTIATION "Template instantiation of the main library" ON)
+option(BUILD_WITH_EXTENDED_TESTING "Build library with extended testing" ON)
+option(BUILD_WITH_BENCHMARK "Build library with timing benchmarks" ON)
 
 # --- OPTIONAL DEPENDENCIES -------------------------
 option(INITIALIZE_WITH_NAN "Initialize Eigen entries with NaN" OFF)
@@ -99,6 +109,16 @@ endif()
 if(ENABLE_TEMPLATE_INSTANTIATION)
   add_compile_definitions(LOIK_ENABLE_TEMPLATE_INSTANTIATION)
   list(APPEND CFLAGS_DEPENDENCIES "-DLOIK_ENABLE_TEMPLATE_INSTANTIATION")
+endif()
+
+if(BUILD_WITH_BENCHMARK)
+  message(STATUS "Benchmarking is enabled")
+  add_compile_definitions(ENABLE_BENCHMARK)
+endif()
+
+if(BUILD_WITH_EXTENDED_TESTING)
+  message(STATUS "Extended testing is enabled")
+  add_compile_definitions(ENABLE_EXTENDED_TESTING)
 endif()
 
 macro(TAG_LIBRARY_VERSION target)
@@ -134,6 +154,14 @@ set(LIB_HEADERS
 set(LIB_TEMPLATE_INSTANTIATION_HEADERS
     ${LIB_HEADER_DIR}/loik-loid.txx ${LIB_HEADER_DIR}/loik-loid-optimized.txx
     ${LIB_HEADER_DIR}/loik-loid-data.txx ${LIB_HEADER_DIR}/loik-loid-data-optimized.txx)
+# set(LIB_EXTENDED_TEST_DIR ${PROJECT_SOURCE_DIR}/problems)
+# set(LIB_EXTENDED_TEST_HEADERS
+#     ${LIB_EXTENDED_TEST_DIR}/test-problems.hpp)
+# set(LIB_EXTENDED_TEST_SOURCES
+#     ${LIB_EXTENDED_TEST_DIR}/test-problems.cpp)
+# set(LIB_BENCH_DIR ${PROJECT_SOURCE_DIR}/bench)
+# set(LIB_BENCH_SOURCES
+#     ${LIB_BENCH_DIR}/timings.cpp)
 
 set(LIB_SOURCE_DIR ${PROJECT_SOURCE_DIR}/src)
 set(LIB_SOURCES)
@@ -145,6 +173,15 @@ if(ENABLE_TEMPLATE_INSTANTIATION)
   list(APPEND LIB_HEADERS ${LIB_TEMPLATE_INSTANTIATION_HEADERS})
   list(APPEND LIB_SOURCES ${LIB_TEMPLATE_INSTANTIATION_SOURCES})
 endif()
+
+# if(BUILD_WITH_BENCHMARK)
+#   list(APPEND LIB_SOURCES ${LIB_BENCH_SOURCES})
+# endif()
+
+# if(BUILD_WITH_EXTENDED_TESTING)
+#   list(APPEND LIB_HEADERS ${LIB_EXTENDED_TEST_HEADERS})
+#   list(APPEND LIB_SOURCES ${LIB_EXTENDED_TEST_SOURCES})
+# endif()
 
 function(set_standard_output_directory target)
   set_target_properties(
@@ -164,7 +201,7 @@ function(create_library)
   endif()
 
   add_library(${PROJECT_NAME} ${library_type} ${LIB_HEADERS} ${LIB_SOURCES})
-  add_library(loik::loik ALIAS ${PROJECT_NAME})
+  add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
   set_standard_output_directory(${PROJECT_NAME})
   set_target_properties(
     ${PROJECT_NAME}
@@ -184,7 +221,10 @@ function(create_library)
   target_link_libraries(${PROJECT_NAME} PUBLIC Eigen3::Eigen)
   target_link_libraries(${PROJECT_NAME} PUBLIC Boost::boost)
 
-  target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:include>)
+  target_include_directories(
+    ${PROJECT_NAME}
+    PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
+           $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 
   cxx_flags_by_compiler_frontend(
     MSVC "/bigobj"
@@ -211,6 +251,15 @@ if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()
 
+if(BUILD_WITH_BENCHMARK)
+  find_package(benchmark REQUIRED)
+  add_subdirectory(bench)
+endif()
+
+if(BUILD_WITH_EXTENDED_TESTING)
+  add_subdirectory(problems)
+endif()
+
 # --- PACKAGING ----------------------------------------------------------------
 macro(EXPORT_VARIABLE var_name var_value)
   get_directory_property(has_parent PARENT_DIRECTORY)
@@ -231,3 +280,5 @@ endif()
 pkg_config_append_libs(${PROJECT_NAME})
 pkg_config_append_boost_libs(${BOOST_REQUIRED_COMPONENTS})
 pkg_config_append_cflags("${CFLAGS_DEPENDENCIES}")
+
+setup_project_finalize()

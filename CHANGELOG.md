@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Formating of the project
+
+### Added
+- Add compatibility with jrl-cmakemodules workspace ([#2](https://github.com/Simple-Robotics/LoIK/pull/2))
+
+### Fixed
+- Remove CMake CMP0167 warnings ([#7](https://github.com/Simple-Robotics/LoIK/pull/7))
+
 ## [1.0.0] - 2024-07-17
 
 ### Added
