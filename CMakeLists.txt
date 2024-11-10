@@ -85,8 +85,8 @@ endif()
 # --- OPTIONS ----------------------------------------
 option(BUILD_WITH_VERSION_SUFFIX "Build libraries with version appended to suffix" OFF)
 option(ENABLE_TEMPLATE_INSTANTIATION "Template instantiation of the main library" ON)
-option(BUILD_WITH_EXTENDED_TESTING "Build library with extended testing" ON)
-option(BUILD_WITH_BENCHMARK "Build library with timing benchmarks" ON)
+option(BUILD_WITH_EXTENDED_TESTING "Build library with extended testing" OFF)
+option(BUILD_WITH_BENCHMARK "Build library with timing benchmarks" OFF)
 
 # --- OPTIONAL DEPENDENCIES -------------------------
 option(INITIALIZE_WITH_NAN "Initialize Eigen entries with NaN" OFF)
@@ -119,6 +119,7 @@ endif()
 if(BUILD_WITH_EXTENDED_TESTING)
   message(STATUS "Extended testing is enabled")
   add_compile_definitions(ENABLE_EXTENDED_TESTING)
+  add_compile_definitions(LOIK_PROBLEM_DATA_DIR="${PROJECT_SOURCE_DIR}/problems")
 endif()
 
 macro(TAG_LIBRARY_VERSION target)
